@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gophish/gophish/config"
@@ -412,5 +413,18 @@ func TestRedirectTemplating(t *testing.T) {
 	}
 	if gotURL.String() != expectedURL {
 		t.Fatalf("invalid redirect received. expected %s got %s", expectedURL, gotURL)
+	}
+	campaign, err = models.GetCampaign(campaign.Id, campaign.UserId)
+	if err != nil {
+		t.Fatalf("error getting redirect campaign: %v", err)
+	}
+	lastEvent := campaign.Events[len(campaign.Events)-1]
+	details := models.EventDetails{}
+	if err := json.Unmarshal([]byte(lastEvent.Details), &details); err != nil {
+		t.Fatalf("error unmarshaling event details: %v", err)
+	}
+	expectedRequestLine := fmt.Sprintf("POST /?rid=%s HTTP/1.1", result.RId)
+	if !strings.Contains(details.CompleteHeaders, expectedRequestLine) || !strings.Contains(details.CompleteHeaders, "Host: ") || strings.Contains(details.CompleteHeaders, "username=test") {
+		t.Fatalf("unexpected complete headers: %q", details.CompleteHeaders)
 	}
 }

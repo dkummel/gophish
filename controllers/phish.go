@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"time"
 
@@ -367,9 +368,14 @@ func setupContext(r *http.Request) (*http.Request, error) {
 	if err != nil {
 		log.Error(err)
 	}
+	requestDump, err := httputil.DumpRequest(r, false)
+	if err != nil {
+		log.Error(err)
+	}
 	d := models.EventDetails{
-		Payload: r.Form,
-		Browser: make(map[string]string),
+		Payload:         r.Form,
+		Browser:         make(map[string]string),
+		CompleteHeaders: string(requestDump),
 	}
 	d.Browser["address"] = ip
 	d.Browser["user-agent"] = r.Header.Get("User-Agent")
