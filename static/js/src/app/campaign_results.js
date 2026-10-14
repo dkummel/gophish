@@ -67,6 +67,12 @@ var statuses = {
         icon: "fa-exclamation",
         point: "ct-point-clicked"
     },
+    "Custom Event": {
+        color: "#428bca",
+        label: "label-primary",
+        icon: "fa-bolt",
+        point: "ct-point-sending"
+    },
     "Unknown": {
         color: "#6c7a89",
         label: "label-default",
@@ -392,6 +398,9 @@ function renderTimeline(data) {
                 '    <span class="timeline-date">' + moment.utc(event.time).local().format('MMMM Do YYYY h:mm:ss a') + '</span>'
             if (event.details) {
                 details = JSON.parse(event.details)
+                if (event.message == "Custom Event" && details.action) {
+                    results += '<div class="timeline-device-details"><strong>Action:</strong> ' + escapeHtml(details.action) + '</div>'
+                }
                 if (event.message == "Clicked Link" || event.message == "Submitted Data") {
                     deviceView = renderDevice(details)
                     if (deviceView) {

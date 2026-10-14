@@ -204,6 +204,64 @@ func TestReportedPhishingEmail(t *testing.T) {
 	}
 }
 
+func TestCustomEvent(t *testing.T) {
+	ctx := setupTest(t)
+	defer tearDown(t, ctx)
+	campaign := getFirstCampaign(t)
+	result := campaign.Results[0]
+	initialStatus := result.Status
+	initialEventCount := len(campaign.Events)
+	eventURL := fmt.Sprintf("%s/event?%s=%s&action=stage_2", ctx.phishServer.URL, models.RecipientParameter, result.RId)
+
+	resp, err := http.Get(eventURL)
+	if err != nil {
+		t.Fatalf("error getting custom event endpoint: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed || resp.Header.Get("Allow") != http.MethodPost {
+		t.Fatalf("unexpected GET response from custom event endpoint: %d", resp.StatusCode)
+	}
+	resp, err = http.Post(fmt.Sprintf("%s/event?%s=%s&action=invalid%%20action", ctx.phishServer.URL, models.RecipientParameter, result.RId), "", nil)
+	if err != nil {
+		t.Fatalf("error posting invalid custom event: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unexpected invalid custom event status: %d", resp.StatusCode)
+	}
+
+	for i := 0; i < 2; i++ {
+		resp, err = http.Post(eventURL, "", nil)
+		if err != nil {
+			t.Fatalf("error posting custom event: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("unexpected custom event status: %d", resp.StatusCode)
+		}
+	}
+
+	campaign = getFirstCampaign(t)
+	result = campaign.Results[0]
+	if result.Status != initialStatus {
+		t.Fatalf("custom event changed result status from %s to %s", initialStatus, result.Status)
+	}
+	if len(campaign.Events) != initialEventCount+2 {
+		t.Fatalf("expected two custom events, got %d", len(campaign.Events)-initialEventCount)
+	}
+	lastEvent := campaign.Events[len(campaign.Events)-1]
+	if lastEvent.Message != models.EventCustom {
+		t.Fatalf("unexpected event message: %s", lastEvent.Message)
+	}
+	details := models.EventDetails{}
+	if err := json.Unmarshal([]byte(lastEvent.Details), &details); err != nil {
+		t.Fatalf("error unmarshaling custom event details: %v", err)
+	}
+	if details.Action != "stage_2" {
+		t.Fatalf("unexpected custom action: %s", details.Action)
+	}
+}
+
 func TestClickedPhishingLinkAfterOpen(t *testing.T) {
 	ctx := setupTest(t)
 	defer tearDown(t, ctx)

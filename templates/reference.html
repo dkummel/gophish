@@ -1,0 +1,67 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">Feature Reference</h1>
+    <p class="lead">Reference for features added to this Gophish installation.</p>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">Custom Events</h3>
+        </div>
+        <div class="panel-body">
+            <p>Use this endpoint from a landing page to record a custom action for a recipient.</p>
+            <dl class="dl-horizontal">
+                <dt>Endpoint</dt>
+                <dd><code>POST /event</code></dd>
+                <dt>Parameters</dt>
+                <dd><code>rid</code> and <code>action</code></dd>
+                <dt>Action format</dt>
+                <dd>1&ndash;64 letters, numbers, underscores, or hyphens</dd>
+                <dt>Request body</dt>
+                <dd>None</dd>
+                <dt>Success</dt>
+                <dd><code>204 No Content</code></dd>
+                <dt>Errors</dt>
+                <dd><code>400</code> invalid action, <code>404</code> invalid recipient or completed campaign, <code>405</code> wrong method</dd>
+            </dl>
+            <p>Every successful call creates a separate <code>Custom Event</code> for an active campaign. It does not change the recipient status.</p>
+            <h4>Landing page snippet</h4>
+            <pre id="custom-event-snippet"><code>&lt;script&gt;
+function trackAction(action) {
+    const url = new URL("/event", "&#123;&#123;.BaseURL&#125;&#125;");
+    url.searchParams.set("rid", "&#123;&#123;.RId&#125;&#125;");
+    url.searchParams.set("action", action);
+
+    return fetch(url, {
+        method: "POST",
+        keepalive: true
+    });
+}
+
+trackAction("stage_2");
+&lt;/script&gt;</code></pre>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">Redirect URL placeholders</h3>
+        </div>
+        <div class="panel-body">
+            <p>A landing page redirect URL can include the recipient identifier. It is replaced separately for each recipient.</p>
+            <pre><code>https://example.com/&#123;&#123;.RId&#125;&#125;/?rid=&#123;&#123;.RId&#125;&#125;</code></pre>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">Event request details</h3>
+        </div>
+        <div class="panel-body">
+            <p>Event JSON contains the original fields and an additional <code>complete-headers</code> field. It stores the HTTP request line and all request headers. The request body is not included.</p>
+            <p>Custom events also contain the specific action in <code>details.action</code>.</p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}{{end}}

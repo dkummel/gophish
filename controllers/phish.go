@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ var ErrInvalidRequest = errors.New("Invalid request")
 // ErrCampaignComplete is thrown when an event is received for a campaign that
 // has already been marked as complete.
 var ErrCampaignComplete = errors.New("Event received on completed campaign")
+
+var customActionPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // TransparencyResponse is the JSON response provided when a third-party
 // makes a request to the transparency handler.
@@ -112,6 +115,7 @@ func (ps *PhishingServer) registerRoutes() {
 	fileServer := http.FileServer(unindexed.Dir("./static/endpoint/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fileServer))
 	router.HandleFunc("/track", ps.TrackHandler)
+	router.HandleFunc("/event", ps.EventHandler)
 	router.HandleFunc("/robots.txt", ps.RobotsHandler)
 	router.HandleFunc("/{path:.*}/track", ps.TrackHandler)
 	router.HandleFunc("/{path:.*}/report", ps.ReportHandler)
@@ -194,6 +198,47 @@ func (ps *PhishingServer) ReportHandler(w http.ResponseWriter, r *http.Request) 
 	err = rs.HandleEmailReport(d)
 	if err != nil {
 		log.Error(err)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// EventHandler records a custom action without changing the result status.
+func (ps *PhishingServer) EventHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	action := r.URL.Query().Get("action")
+	if !customActionPattern.MatchString(action) {
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
+	}
+	r, err := setupContext(r)
+	if err != nil {
+		if err != ErrInvalidRequest && err != ErrCampaignComplete {
+			log.Error(err)
+		}
+		http.NotFound(w, r)
+		return
+	}
+	if _, ok := ctx.Get(r, "result").(models.EmailRequest); ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	rid := ctx.Get(r, "rid").(string)
+	if strings.HasSuffix(rid, TransparencySuffix) {
+		ps.TransparencyHandler(w, r)
+		return
+	}
+	rs := ctx.Get(r, "result").(models.Result)
+	d := ctx.Get(r, "details").(models.EventDetails)
+	d.Action = action
+	if err := rs.HandleCustomEvent(d); err != nil {
+		log.Error(err)
+		http.Error(w, "Unable to record event", http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

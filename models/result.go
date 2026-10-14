@@ -147,6 +147,19 @@ func (r *Result) HandleEmailReport(details EventDetails) error {
 	return db.Save(r).Error
 }
 
+// HandleCustomEvent records a custom event without changing the result status.
+func (r *Result) HandleCustomEvent(details EventDetails) error {
+	dj, err := json.Marshal(details)
+	if err != nil {
+		return err
+	}
+	return AddEvent(&Event{
+		Email:   r.Email,
+		Message: EventCustom,
+		Details: string(dj),
+	}, r.CampaignId)
+}
+
 // UpdateGeo updates the latitude and longitude of the result in
 // the database given an IP address
 func (r *Result) UpdateGeo(addr string) error {

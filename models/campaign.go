@@ -88,6 +88,7 @@ type EventDetails struct {
 	Payload         url.Values        `json:"payload"`
 	Browser         map[string]string `json:"browser"`
 	CompleteHeaders string            `json:"complete-headers"`
+	Action          string            `json:"action,omitempty"`
 }
 
 // EventError is a struct that wraps an error that occurs when sending an

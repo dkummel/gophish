@@ -3,11 +3,13 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/gophish/gophish/models"
 )
 
 func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username, password, optionalPath string) *http.Response {
@@ -115,6 +117,41 @@ func TestSuccessfulRedirect(t *testing.T) {
 	}
 	if url.Path != next {
 		t.Fatalf("unexpected Location header received. expected %s got %s", next, url.Path)
+	}
+}
+
+func TestFeatureReference(t *testing.T) {
+	ctx := setupTest(t)
+	defer tearDown(t, ctx)
+	user, err := models.GetUser(1)
+	if err != nil {
+		t.Fatalf("error getting admin user: %v", err)
+	}
+	user.PasswordChangeRequired = false
+	if err := models.PutUser(&user); err != nil {
+		t.Fatalf("error updating admin user: %v", err)
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("error creating cookie jar: %v", err)
+	}
+	client := &http.Client{Jar: jar}
+	resp := attemptLogin(t, ctx, client, "admin", "gophish", "")
+	resp.Body.Close()
+
+	resp, err = client.Get(fmt.Sprintf("%s/reference", ctx.adminServer.URL))
+	if err != nil {
+		t.Fatalf("error requesting the feature reference: %v", err)
+	}
+	doc, err := goquery.NewDocumentFromResponse(resp)
+	if err != nil {
+		t.Fatalf("error parsing the feature reference: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected feature reference status: %d", resp.StatusCode)
+	}
+	if !strings.Contains(doc.Find("#custom-event-snippet").Text(), `{{.RId}}`) {
+		t.Fatal("custom event snippet does not contain the recipient placeholder")
 	}
 }
 
